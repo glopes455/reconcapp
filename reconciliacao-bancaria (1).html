@@ -1,0 +1,580 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Reconciliação Bancária</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,500;1,9..144,300&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+:root{--bg:#F5F3EE;--surface:#FDFCF9;--border:#E2DDD5;--border-mid:#C8C2B6;--text:#1C1A17;--text-mid:#6B6560;--text-light:#9E9890;--cgd-bg:#E8F5EF;--cgd-text:#1A5C3A;--cgd-accent:#2E8B57;--nb-bg:#E8EFF8;--nb-text:#1A3A6B;--nb-accent:#2155A3;--bcp-bg:#F7EDE8;--bcp-text:#6B2A1A;--bcp-accent:#C0451E;--ok-bg:#EBF5E8;--ok-text:#2A6B1A;--pend-bg:#FBF3E2;--pend-text:#8A5A0A;--late-bg:#FCEAEA;--late-text:#8A1A1A;--warn-bg:#FFF3CD;--warn-text:#856404;--shadow:0 1px 3px rgba(28,26,23,.06),0 4px 16px rgba(28,26,23,.04)}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{font-size:15px}
+body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;font-weight:300}
+.layout{display:flex;min-height:100vh}
+.sidebar{width:220px;flex-shrink:0;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;padding:2rem 0 1.5rem;position:sticky;top:0;height:100vh;overflow-y:auto}
+.logo{padding:0 1.5rem 2rem;border-bottom:1px solid var(--border);margin-bottom:1.5rem}
+.logo-mark{font-family:'Fraunces',serif;font-size:1.35rem;font-weight:300;line-height:1.2;letter-spacing:-0.02em}
+.logo-mark span{color:var(--text-light);font-style:italic}
+.logo-sub{font-size:0.7rem;color:var(--text-light);letter-spacing:0.08em;text-transform:uppercase;margin-top:4px}
+.nav{flex:1;padding:0 0.75rem}
+.nav-item{display:flex;align-items:center;gap:10px;padding:0.6rem 0.75rem;border-radius:8px;cursor:pointer;font-size:0.875rem;font-weight:400;color:var(--text-mid);transition:all .15s;border:none;background:none;width:100%;text-align:left;margin-bottom:2px}
+.nav-item:hover{background:var(--bg);color:var(--text)}
+.nav-item.active{background:var(--text);color:#fff}
+.nav-icon{width:16px;height:16px;opacity:0.7;flex-shrink:0}
+.nav-item.active .nav-icon{opacity:1}
+.nav-badge{margin-left:auto;font-size:0.65rem;font-weight:500;padding:1px 6px;border-radius:20px;background:rgba(0,0,0,0.08);min-width:18px;text-align:center}
+.nav-badge.pend{background:var(--pend-bg);color:var(--pend-text)}
+.nav-item.active .nav-badge{background:rgba(255,255,255,0.2);color:#fff}
+.nav-section{font-size:0.65rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--text-light);padding:1rem 1.5rem 0.4rem}
+.sidebar-bottom{padding:1.25rem 1.5rem 0;margin-top:auto;border-top:1px solid var(--border)}
+.bank-chip{display:inline-flex;align-items:center;gap:5px;font-size:0.7rem;font-weight:500;padding:3px 8px;border-radius:20px;margin:2px}
+.chip-cgd{background:var(--cgd-bg);color:var(--cgd-text)}
+.chip-nb{background:var(--nb-bg);color:var(--nb-text)}
+.chip-bcp{background:var(--bcp-bg);color:var(--bcp-text)}
+.main{flex:1;min-width:0}
+.topbar{background:var(--surface);border-bottom:1px solid var(--border);padding:1rem 2rem;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:10}
+.page-title{font-family:'Fraunces',serif;font-size:1.1rem;font-weight:300;letter-spacing:-0.01em}
+.btn{padding:7px 16px;border-radius:8px;border:1px solid var(--border-mid);background:var(--surface);color:var(--text);font-size:0.8rem;font-family:'DM Sans',sans-serif;font-weight:400;cursor:pointer;transition:all .15s;display:inline-flex;align-items:center;gap:6px}
+.btn:hover{background:var(--bg)}
+.btn-primary{background:var(--text);color:#fff;border-color:var(--text)}
+.btn-primary:hover{opacity:0.85}
+.btn-danger{background:var(--late-bg);color:var(--late-text);border-color:#f5c6c6}
+.btn-danger:hover{background:#f8d7d7}
+.btn-sm{padding:4px 10px;font-size:0.73rem;border-radius:6px}
+.btn-xs{padding:2px 7px;font-size:0.68rem;border-radius:5px}
+.content{padding:2rem}
+.panel{display:none}
+.panel.active{display:block;animation:fadeIn .2s ease}
+@keyframes fadeIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:1.25rem 1.5rem;margin-bottom:1rem;box-shadow:var(--shadow)}
+.card-title{font-size:0.7rem;font-weight:500;letter-spacing:0.08em;text-transform:uppercase;color:var(--text-light);margin-bottom:1rem}
+.metrics-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:1.25rem}
+.metric{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:1.25rem;box-shadow:var(--shadow)}
+.metric-label{font-size:0.72rem;color:var(--text-light);margin-bottom:0.5rem;letter-spacing:0.04em}
+.metric-value{font-family:'Fraunces',serif;font-size:2rem;font-weight:300;line-height:1;letter-spacing:-0.03em}
+.metric-value.ok{color:var(--cgd-accent)}
+.metric-value.warn{color:#C08A0A}
+.metric-value.danger{color:var(--bcp-accent)}
+.upload-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-bottom:1rem}
+.upload-zone{border:1.5px dashed var(--border-mid);border-radius:10px;padding:1.25rem;text-align:center;cursor:pointer;transition:all .2s;background:var(--bg)}
+.upload-zone:hover{border-color:var(--text-mid);background:var(--surface)}
+.upload-zone.done{border-style:solid;border-color:var(--cgd-accent);background:var(--ok-bg)}
+.upload-zone input{display:none}
+.uz-icon{font-size:1.5rem;margin-bottom:6px;opacity:0.5}
+.uz-label{font-size:0.8rem;color:var(--text-mid)}
+.uz-label strong{color:var(--text)}
+.uz-done{font-size:0.78rem;font-weight:500;color:var(--cgd-accent);margin-top:4px}
+.uz-rows{font-size:0.7rem;color:var(--text-light);margin-top:2px}
+.table-wrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:0.8rem}
+th{text-align:left;font-size:0.68rem;font-weight:500;letter-spacing:0.06em;text-transform:uppercase;color:var(--text-light);padding:6px 10px;border-bottom:1px solid var(--border);white-space:nowrap}
+td{padding:8px 10px;border-bottom:1px solid var(--border);vertical-align:middle}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:var(--bg)}
+.mono{font-family:'DM Mono',monospace;font-size:0.75rem}
+.badge{font-size:0.68rem;font-weight:500;padding:2px 9px;border-radius:20px;white-space:nowrap;display:inline-block}
+.b-ok{background:var(--ok-bg);color:var(--ok-text)}
+.b-pend{background:var(--pend-bg);color:var(--pend-text)}
+.b-late{background:var(--late-bg);color:var(--late-text)}
+.b-cgd{background:var(--cgd-bg);color:var(--cgd-text)}
+.b-nb{background:var(--nb-bg);color:var(--nb-text)}
+.b-bcp{background:var(--bcp-bg);color:var(--bcp-text)}
+.b-gray{background:#F0EDE8;color:var(--text-mid)}
+.match-chip{font-size:0.62rem;padding:1px 6px;border-radius:20px;background:var(--nb-bg);color:var(--nb-text);font-weight:500;margin-left:4px;vertical-align:middle}
+.filters{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.sel{font-size:0.78rem;padding:6px 10px;border-radius:7px;border:1px solid var(--border-mid);background:var(--surface);color:var(--text);font-family:'DM Sans',sans-serif;cursor:pointer}
+.alert{border-radius:8px;padding:0.75rem 1rem;font-size:0.8rem;margin-bottom:1rem}
+.alert-warn{background:var(--warn-bg);border:1px solid #E5C87A;color:var(--warn-text)}
+.prog-row{display:flex;align-items:center;gap:10px}
+.prog-bar{flex:1;height:4px;background:var(--bg);border-radius:2px;overflow:hidden;min-width:80px}
+.prog-fill{height:100%;border-radius:2px}
+.prog-pct{font-family:'DM Mono',monospace;font-size:0.72rem;color:var(--text-mid);min-width:34px}
+.empty{text-align:center;padding:3rem 1rem;color:var(--text-light);font-size:0.85rem}
+.empty-icon{font-size:2rem;margin-bottom:8px;opacity:0.4}
+.row-between{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:1rem;flex-wrap:wrap}
+.log-row{display:flex;align-items:flex-start;gap:12px;padding:12px 0;border-bottom:1px solid var(--border)}
+.log-row:last-child{border-bottom:none}
+.log-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;margin-top:6px}
+.verify-row{display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--border);font-size:0.75rem}
+.modal-overlay{position:fixed;inset:0;background:rgba(28,26,23,0.5);z-index:100;display:flex;align-items:center;justify-content:center;padding:1rem}
+.modal{background:var(--surface);border-radius:14px;padding:1.5rem;max-width:460px;width:100%;box-shadow:0 20px 60px rgba(28,26,23,.2)}
+.modal-title{font-family:'Fraunces',serif;font-size:1.1rem;font-weight:300;margin-bottom:0.5rem}
+.modal-body{font-size:0.85rem;color:var(--text-mid);margin-bottom:1.25rem;line-height:1.6}
+.modal-actions{display:flex;gap:8px;justify-content:flex-end}
+</style>
+</head>
+<body>
+<div class="layout">
+<aside class="sidebar">
+  <div class="logo">
+    <div class="logo-mark">Reconcilia<span>ção</span></div>
+    <div class="logo-sub">Bancária · v2.0</div>
+  </div>
+  <nav class="nav">
+    <div class="nav-section">Navegação</div>
+    <button class="nav-item active" onclick="goTab('import')">
+      <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 10V2M5 7l3 3 3-3M2 12v1a1 1 0 001 1h10a1 1 0 001-1v-1"/></svg>
+      Importar
+    </button>
+    <button class="nav-item" onclick="goTab('painel')">
+      <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="2" width="5" height="5" rx="1"/><rect x="9" y="2" width="5" height="5" rx="1"/><rect x="2" y="9" width="5" height="5" rx="1"/><rect x="9" y="9" width="5" height="5" rx="1"/></svg>
+      Painel
+      <span class="nav-badge" id="badge-all" style="display:none"></span>
+    </button>
+    <button class="nav-item" onclick="goTab('pendentes')">
+      <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="6"/><path d="M8 5v3l2 2"/></svg>
+      Pendentes
+      <span class="nav-badge pend" id="badge-pend" style="display:none"></span>
+    </button>
+    <button class="nav-item" onclick="goTab('resumo')">
+      <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 12l4-4 3 3 5-6"/></svg>
+      Resumo
+    </button>
+    <button class="nav-item" onclick="goTab('historico')">
+      <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="6"/><path d="M8 4v4l3 1.5"/></svg>
+      Histórico
+      <span class="nav-badge" id="badge-imports" style="display:none"></span>
+    </button>
+  </nav>
+  <div class="sidebar-bottom">
+    <div style="font-size:0.65rem;color:var(--text-light);letter-spacing:.08em;text-transform:uppercase;margin-bottom:6px">Bancos</div>
+    <span class="bank-chip chip-cgd">● CGD</span>
+    <span class="bank-chip chip-nb">● Novo Banco</span>
+    <span class="bank-chip chip-bcp">● BCP</span>
+  </div>
+</aside>
+
+<div class="main">
+  <div class="topbar">
+    <div class="page-title" id="page-title">Importar dados</div>
+    <button class="btn btn-danger btn-sm" onclick="limparTudo()">Limpar tudo</button>
+  </div>
+  <div class="content">
+
+    <!-- IMPORTAR -->
+    <div id="tab-import" class="panel active">
+      <div class="card">
+        <div class="card-title">Extrato da contabilidade</div>
+        <p style="font-size:0.82rem;color:var(--text-mid);margin-bottom:1rem;line-height:1.6">O sistema detecta os cheques pelas linhas com a palavra <strong>CHEQUE</strong> na descrição. Ex: <span class="mono">CHEQUE 164709411</span>. O match com os extratos bancários é feito por <strong>número + valor</strong>.</p>
+        <div class="upload-zone" id="zone-conta" onclick="document.getElementById('f-conta').click()">
+          <input type="file" id="f-conta" accept=".xlsx,.xls,.csv" onchange="importarContabilidade(this)">
+          <div class="uz-icon">📊</div>
+          <div class="uz-label"><strong>Clica para carregar</strong> o ficheiro de contabilidade<br><span style="font-size:0.72rem">Excel ou CSV · Data · Descrição (CHEQUE XXXXXXX) · Valor · Banco</span></div>
+          <div class="uz-done" id="uz-conta-done" style="display:none"></div>
+          <div class="uz-rows" id="uz-conta-rows" style="display:none"></div>
+        </div>
+        <div id="verify-list" style="margin-top:1rem;display:none">
+          <div style="font-size:0.78rem;font-weight:500;margin-bottom:8px;color:var(--warn-text)">⚠️ Linhas com CHEQUE mas número não extraído — verifica manualmente:</div>
+          <div id="verify-items"></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title">Extratos bancários</div>
+        <p style="font-size:0.82rem;color:var(--text-mid);margin-bottom:1rem;line-height:1.6">Assim que importares, os cheques pendentes são reconciliados automaticamente. O ficheiro de origem fica registado em cada cheque reconciliado.</p>
+        <div class="upload-grid">
+          <div class="upload-zone" id="zone-cgd" onclick="document.getElementById('f-cgd').click()">
+            <input type="file" id="f-cgd" accept=".xlsx,.xls,.csv" onchange="importarBanco('cgd',this)">
+            <div class="uz-icon">🏦</div>
+            <div class="uz-label"><span class="badge b-cgd" style="margin-bottom:6px;display:inline-block">CGD</span><br><strong>Clica para carregar</strong></div>
+            <div class="uz-done" id="uz-cgd-done" style="display:none"></div>
+            <div class="uz-rows" id="uz-cgd-rows" style="display:none"></div>
+          </div>
+          <div class="upload-zone" id="zone-nb" onclick="document.getElementById('f-nb').click()">
+            <input type="file" id="f-nb" accept=".xlsx,.xls,.csv" onchange="importarBanco('nb',this)">
+            <div class="uz-icon">🏦</div>
+            <div class="uz-label"><span class="badge b-nb" style="margin-bottom:6px;display:inline-block">Novo Banco</span><br><strong>Clica para carregar</strong></div>
+            <div class="uz-done" id="uz-nb-done" style="display:none"></div>
+            <div class="uz-rows" id="uz-nb-rows" style="display:none"></div>
+          </div>
+          <div class="upload-zone" id="zone-bcp" onclick="document.getElementById('f-bcp').click()">
+            <input type="file" id="f-bcp" accept=".xlsx,.xls,.csv" onchange="importarBanco('bcp',this)">
+            <div class="uz-icon">🏦</div>
+            <div class="uz-label"><span class="badge b-bcp" style="margin-bottom:6px;display:inline-block">BCP</span><br><strong>Clica para carregar</strong></div>
+            <div class="uz-done" id="uz-bcp-done" style="display:none"></div>
+            <div class="uz-rows" id="uz-bcp-rows" style="display:none"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- PAINEL -->
+    <div id="tab-painel" class="panel">
+      <div class="metrics-grid">
+        <div class="metric"><div class="metric-label">Total cheques</div><div class="metric-value" id="m-tot">0</div></div>
+        <div class="metric"><div class="metric-label">Reconciliados</div><div class="metric-value ok" id="m-rec">0</div></div>
+        <div class="metric"><div class="metric-label">Pendentes</div><div class="metric-value warn" id="m-pend">0</div></div>
+        <div class="metric"><div class="metric-label">Valor pendente (€)</div><div class="metric-value danger" id="m-val">0,00</div></div>
+      </div>
+      <div id="alert-late" class="alert alert-warn" style="display:none"></div>
+      <div class="card">
+        <div class="row-between">
+          <div class="card-title" style="margin:0">Todos os cheques</div>
+          <div class="filters">
+            <select class="sel" id="f-bank" onchange="renderPainel()"><option value="">Todos os bancos</option><option value="CGD">CGD</option><option value="Novo Banco">Novo Banco</option><option value="BCP">BCP</option></select>
+            <select class="sel" id="f-st" onchange="renderPainel()"><option value="">Todos os estados</option><option value="Reconciliado">Reconciliados</option><option value="Pendente">Pendentes</option></select>
+          </div>
+        </div>
+        <div class="table-wrap" id="tbl-painel"><div class="empty"><div class="empty-icon">📋</div>Importa a contabilidade para ver os cheques</div></div>
+      </div>
+    </div>
+
+    <!-- PENDENTES -->
+    <div id="tab-pendentes" class="panel">
+      <div class="card">
+        <div class="row-between">
+          <div class="card-title" style="margin:0">Cheques por descontar</div>
+          <select class="sel" id="f-pend-bank" onchange="renderPendentes()"><option value="">Todos os bancos</option><option value="CGD">CGD</option><option value="Novo Banco">Novo Banco</option><option value="BCP">BCP</option></select>
+        </div>
+        <div class="table-wrap" id="tbl-pend"><div class="empty"><div class="empty-icon">⏳</div>Sem dados</div></div>
+      </div>
+    </div>
+
+    <!-- RESUMO -->
+    <div id="tab-resumo" class="panel">
+      <div class="card">
+        <div class="card-title">Resumo por banco</div>
+        <div id="tbl-resumo"><div class="empty"><div class="empty-icon">📊</div>Sem dados</div></div>
+      </div>
+      <div class="card" id="card-rec" style="display:none">
+        <div class="card-title">Cheques reconciliados — detalhe completo</div>
+        <div class="table-wrap" id="tbl-rec"></div>
+      </div>
+    </div>
+
+    <!-- HISTÓRICO -->
+    <div id="tab-historico" class="panel">
+      <div class="card">
+        <div class="row-between">
+          <div class="card-title" style="margin:0">Ficheiros importados</div>
+          <span style="font-size:0.78rem;color:var(--text-light)" id="hist-count"></span>
+        </div>
+        <div id="hist-list"><div class="empty"><div class="empty-icon">🗂</div>Nenhum ficheiro importado ainda</div></div>
+      </div>
+    </div>
+
+  </div>
+</div>
+</div>
+
+<!-- MODAL -->
+<div class="modal-overlay" id="modal" style="display:none" onclick="closeModalOverlay(event)">
+  <div class="modal">
+    <div class="modal-title" id="modal-title"></div>
+    <div class="modal-body" id="modal-body"></div>
+    <div class="modal-actions" id="modal-actions"></div>
+  </div>
+</div>
+
+<script>
+let cheques=[];
+let importLog=[];
+const pageTitles={import:'Importar dados',painel:'Painel de cheques',pendentes:'Cheques pendentes',resumo:'Resumo',historico:'Histórico de importações'};
+
+function goTab(name){
+  ['import','painel','pendentes','resumo','historico'].forEach((t,i)=>{
+    document.querySelectorAll('.nav-item')[i].classList.toggle('active',t===name);
+    const p=document.getElementById('tab-'+t);
+    p.style.display=t===name?'block':'none';
+    p.classList.toggle('active',t===name);
+  });
+  document.getElementById('page-title').textContent=pageTitles[name];
+}
+
+function parseDate(v){
+  if(!v)return null;
+  if(v instanceof Date)return isNaN(v)?null:v;
+  if(typeof v==='number'){const d=new Date(Math.round((v-25569)*86400*1000));return isNaN(d)?null:d;}
+  const s=String(v).trim();
+  const m=s.match(/(\d{2})[\/\-\.](\d{2})[\/\-\.](\d{4})/);
+  if(m)return new Date(+m[3],+m[2]-1,+m[1]);
+  const m2=s.match(/(\d{4})[\/\-\.](\d{2})[\/\-\.](\d{2})/);
+  if(m2)return new Date(+m2[1],+m2[2]-1,+m2[3]);
+  const d=new Date(s);return isNaN(d)?null:d;
+}
+function parseVal(v){
+  if(v==null||v==='')return null;
+  if(typeof v==='number')return Math.abs(v);
+  const n=parseFloat(String(v).replace(/\s/g,'').replace(',','.').replace(/[^\d.\-]/g,''));
+  return isNaN(n)?null:Math.abs(n);
+}
+function extractNum(s){
+  if(!s)return null;
+  const all=String(s).match(/\d{6,}/g);
+  return all?all[all.length-1]:null;
+}
+function numFromConta(descr){
+  const u=String(descr||'').toUpperCase();
+  if(!u.includes('CHEQUE')&&!u.includes('CHQ'))return null;
+  return extractNum(descr);
+}
+function numFromBanco(row,bancoId){
+  const keys=Object.keys(row);
+  let descr='';
+  keys.forEach(k=>{const kl=k.toLowerCase();if(kl.includes('descri')||kl.includes('desc')||kl.includes('histor')||kl.includes('observ'))descr=String(row[k]||'');});
+  if(!descr)keys.forEach(k=>{const v=String(row[k]||'').toUpperCase();if(v.includes('CHEQUE')||v.includes('CAIXA BR'))descr=String(row[k]||'');});
+  if(bancoId==='cgd')return extractNum(descr);
+  const m=descr.toUpperCase().match(/CHEQUE\s+(\d+)/);
+  if(m)return m[1];
+  return extractNum(descr);
+}
+function guessBanco(s){
+  const u=String(s||'').toUpperCase();
+  if(u.includes('CGD')||u.includes('CAIXA GERAL'))return 'CGD';
+  if(u.includes('NOVO')||u.includes('NB ')||u.includes('BES'))return 'Novo Banco';
+  if(u.includes('BCP')||u.includes('MILLENNIUM'))return 'BCP';
+  return '';
+}
+function readFile(file,cb){
+  const r=new FileReader();
+  r.onload=e=>{const wb=XLSX.read(new Uint8Array(e.target.result),{type:'array'});cb(XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{defval:'',raw:true}));};
+  r.readAsArrayBuffer(file);
+}
+function fDate(d){if(!d)return'—';try{return d.toLocaleDateString('pt-PT');}catch{return'—';}}
+function fDateTime(d){if(!d)return'—';try{return d.toLocaleDateString('pt-PT')+' '+d.toLocaleTimeString('pt-PT',{hour:'2-digit',minute:'2-digit'});}catch{return'—';}}
+function daysBetween(a,b){return Math.round(Math.abs((b-a)/86400000));}
+function bankBadge(b){const cls={CGD:'b-cgd','Novo Banco':'b-nb',BCP:'b-bcp'};return`<span class="badge ${cls[b]||'b-gray'}">${b||'?'}</span>`;}
+function genId(){return Date.now().toString(36)+Math.random().toString(36).slice(2,6);}
+
+function importarContabilidade(input){
+  if(!input.files[0])return;
+  const fname=input.files[0].name;
+  readFile(input.files[0],rows=>{
+    const novos=[];const verificar=[];
+    rows.forEach(row=>{
+      const keys=Object.keys(row);
+      let data=null,valor=null,descr='',banco='';
+      keys.forEach(k=>{
+        const kl=k.toLowerCase();
+        if(!data&&(kl.includes('data')||kl.includes('date')))data=parseDate(row[k]);
+        if(kl.includes('descri')||kl.includes('desc'))descr=String(row[k]||'');
+        if(!valor&&(kl.includes('débit')||kl.includes('debit')||kl.includes('crédit')||kl.includes('credit')||kl.includes('valor')||kl.includes('montant')||kl.includes('moviment')))valor=parseVal(row[k]);
+        if(kl.includes('banco')||kl.includes('bank'))banco=String(row[k]||'');
+      });
+      const num=numFromConta(descr);
+      if(!num){const u=descr.toUpperCase();if(u.includes('CHEQUE')||u.includes('CHQ'))verificar.push(descr);return;}
+      if(!valor){keys.forEach(k=>{const v=parseVal(row[k]);if(v&&v>0&&!valor)valor=v;});}
+      if(!cheques.find(c=>c.num===num)){
+        novos.push({id:genId(),num,descr,data,valor,banco:banco||guessBanco(descr),estado:'Pendente',dataDesconto:null,ficheiroOrigem:fname,ficheiroDesconto:null,matchMethod:null});
+      }
+    });
+    cheques.push(...novos);
+    importLog.push({id:genId(),tipo:'contabilidade',banco:null,ficheiro:fname,data:new Date(),totalLinhas:rows.length,chequesEncontrados:novos.length,chequesReconciliados:0,usado:false});
+    if(verificar.length){
+      document.getElementById('verify-list').style.display='block';
+      document.getElementById('verify-items').innerHTML=verificar.map(d=>`<div class="verify-row"><span class="badge" style="background:var(--warn-bg);color:var(--warn-text);font-size:0.65rem">⚠ verificar</span><span class="mono">${d}</span></div>`).join('');
+    }
+    setDone('conta',fname,novos.length+' cheques encontrados');
+    updateAll();renderHistorico();goTab('painel');
+  });
+}
+
+function importarBanco(id,input){
+  if(!input.files[0])return;
+  const fname=input.files[0].name;
+  const bancoName={cgd:'CGD',nb:'Novo Banco',bcp:'BCP'}[id];
+  readFile(input.files[0],rows=>{
+    let reconciliados=0;const verificar=[];
+    rows.forEach(row=>{
+      const numB=numFromBanco(row,id);
+      if(!numB){
+        const vals=Object.values(row).map(v=>String(v||'').toUpperCase());
+        if(vals.some(v=>v.includes('CHEQUE')||v.includes('CAIXA BR')))verificar.push(Object.values(row).slice(0,4).join(' | '));
+        return;
+      }
+      const keys=Object.keys(row);
+      let dataDesc=null,valorB=null;
+      keys.forEach(k=>{
+        const kl=k.toLowerCase();
+        if(!dataDesc&&(kl.includes('data')||kl.includes('date')))dataDesc=parseDate(row[k]);
+        if(!valorB&&(kl.includes('moviment')||kl.includes('valor')||kl.includes('montant')||kl.includes('crédit')||kl.includes('débit')))valorB=parseVal(row[k]);
+      });
+      if(!valorB){keys.forEach(k=>{const v=parseVal(row[k]);if(v&&v>0&&!valorB)valorB=v;});}
+      const c=cheques.find(x=>{
+        if(x.estado!=='Pendente')return false;
+        const numOk=x.num===numB;
+        const valOk=!valorB||!x.valor||Math.abs(x.valor-valorB)<0.02;
+        return numOk&&valOk;
+      });
+      if(c){c.estado='Reconciliado';c.dataDesconto=dataDesc||new Date();c.ficheiroDesconto=fname;c.matchMethod='n.º+valor';if(!c.banco)c.banco=bancoName;reconciliados++;}
+    });
+    importLog.push({id:genId(),tipo:'banco',banco:bancoName,ficheiro:fname,data:new Date(),totalLinhas:rows.length,chequesEncontrados:rows.length,chequesReconciliados:reconciliados,usado:reconciliados>0});
+    if(reconciliados>0)importLog.filter(l=>l.tipo==='contabilidade').forEach(l=>l.usado=true);
+    if(verificar.length){
+      showModal('⚠️ Linhas para verificar — '+bancoName,
+        '<p style="margin-bottom:8px">Estas linhas parecem conter cheques mas o número não foi extraído com certeza. Verifica manualmente:</p>'+
+        verificar.slice(0,6).map(v=>`<div class="mono" style="font-size:0.72rem;padding:5px 0;border-bottom:1px solid var(--border);word-break:break-all">${v.substring(0,120)}</div>`).join(''),
+        [{label:'Entendido',cls:'btn btn-primary',action:'fecharModal()'}]
+      );
+    }
+    setDone(id,fname,reconciliados+' cheques reconciliados');
+    updateAll();renderHistorico();
+  });
+}
+
+function setDone(id,fname,info){
+  document.getElementById('zone-'+id).classList.add('done');
+  const d=document.getElementById('uz-'+id+'-done');d.textContent='✓ '+fname;d.style.display='block';
+  const r=document.getElementById('uz-'+id+'-rows');r.textContent=info;r.style.display='block';
+  const l=document.querySelector('#zone-'+id+' .uz-label');if(l)l.style.display='none';
+  const ic=document.querySelector('#zone-'+id+' .uz-icon');if(ic)ic.style.display='none';
+}
+
+function updateAll(){
+  const tot=cheques.length,rec=cheques.filter(c=>c.estado==='Reconciliado').length;
+  const pend=tot-rec,val=cheques.filter(c=>c.estado==='Pendente').reduce((s,c)=>s+(c.valor||0),0);
+  document.getElementById('m-tot').textContent=tot;
+  document.getElementById('m-rec').textContent=rec;
+  document.getElementById('m-pend').textContent=pend;
+  document.getElementById('m-val').textContent=val.toLocaleString('pt-PT',{minimumFractionDigits:2,maximumFractionDigits:2});
+  const ba=document.getElementById('badge-all');ba.textContent=tot;ba.style.display=tot?'inline':'none';
+  const bp=document.getElementById('badge-pend');bp.textContent=pend;bp.style.display=pend?'inline':'none';
+  const bi=document.getElementById('badge-imports');bi.textContent=importLog.length;bi.style.display=importLog.length?'inline':'none';
+  const today=new Date();
+  const late=cheques.filter(c=>c.estado==='Pendente'&&c.data&&daysBetween(c.data,today)>30);
+  const al=document.getElementById('alert-late');
+  if(late.length){al.textContent='⚠️ Atenção: '+late.length+' cheque(s) pendente(s) há mais de 30 dias.';al.style.display='block';}
+  else al.style.display='none';
+  renderPainel();renderPendentes();renderResumo();
+}
+
+function renderPainel(){
+  const bf=document.getElementById('f-bank').value,sf=document.getElementById('f-st').value;
+  const data=cheques.filter(c=>(!bf||c.banco===bf)&&(!sf||c.estado===sf));
+  if(!data.length){document.getElementById('tbl-painel').innerHTML='<div class="empty"><div class="empty-icon">📋</div>Sem resultados</div>';return;}
+  const today=new Date();
+  let h='<table><thead><tr><th>N.º cheque</th><th>Banco</th><th>Data emissão</th><th>Data desconto</th><th style="text-align:right">Valor (€)</th><th>Dias</th><th>Ficheiro origem</th><th>Estado</th><th></th></tr></thead><tbody>';
+  data.forEach(c=>{
+    const dias=c.dataDesconto?daysBetween(c.data,c.dataDesconto):c.data?daysBetween(c.data,today):null;
+    const isLate=c.estado==='Pendente'&&dias>30;
+    const st=c.estado==='Reconciliado'?`<span class="badge b-ok">Reconciliado</span>${c.matchMethod?`<span class="match-chip">${c.matchMethod}</span>`:''}`
+      :isLate?'<span class="badge b-late">Pendente +30d</span>':'<span class="badge b-pend">Pendente</span>';
+    const act=c.estado==='Pendente'?`<button class="btn btn-sm" onclick="markRec('${c.id}')">✓ Marcar</button>`:'';
+    h+=`<tr style="${isLate?'background:var(--pend-bg)':''}"><td class="mono">${c.num}</td><td>${bankBadge(c.banco)}</td><td>${fDate(c.data)}</td><td>${fDate(c.dataDesconto)}</td><td style="text-align:right" class="mono">${c.valor!=null?c.valor.toLocaleString('pt-PT',{minimumFractionDigits:2}):'—'}</td><td style="font-size:0.73rem;color:var(--text-light)">${dias!=null?dias+'d':'—'}</td><td style="font-size:0.72rem;color:var(--text-light);max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${c.ficheiroOrigem||''}">${c.ficheiroOrigem||'—'}</td><td>${st}</td><td>${act}</td></tr>`;
+  });
+  document.getElementById('tbl-painel').innerHTML=h+'</tbody></table>';
+}
+
+function renderPendentes(){
+  const bf=document.getElementById('f-pend-bank').value;
+  const data=cheques.filter(c=>c.estado==='Pendente'&&(!bf||c.banco===bf));
+  if(!data.length){document.getElementById('tbl-pend').innerHTML='<div class="empty"><div class="empty-icon">✅</div>Sem cheques pendentes</div>';return;}
+  const today=new Date();
+  data.sort((a,b)=>(a.data||today)-(b.data||today));
+  let h='<table><thead><tr><th>N.º cheque</th><th>Banco</th><th>Data emissão</th><th style="text-align:right">Valor (€)</th><th>Dias em aberto</th><th>Alerta</th><th>Ficheiro</th><th></th></tr></thead><tbody>';
+  data.forEach(c=>{
+    const dias=c.data?daysBetween(c.data,today):null;
+    const al=dias==null?'—':dias>60?'<span class="badge b-late">+60 dias</span>':dias>30?'<span class="badge b-pend">+30 dias</span>':'<span style="font-size:0.72rem;color:var(--text-light)">Normal</span>';
+    h+=`<tr><td class="mono">${c.num}</td><td>${bankBadge(c.banco)}</td><td>${fDate(c.data)}</td><td style="text-align:right" class="mono">${c.valor!=null?c.valor.toLocaleString('pt-PT',{minimumFractionDigits:2}):'—'}</td><td><strong>${dias!=null?dias:'—'}</strong>${dias!=null?' dias':''}</td><td>${al}</td><td style="font-size:0.72rem;color:var(--text-light);max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${c.ficheiroOrigem||'—'}</td><td><button class="btn btn-sm" onclick="markRec('${c.id}')">✓ Marcar</button></td></tr>`;
+  });
+  document.getElementById('tbl-pend').innerHTML=h+'</tbody></table>';
+}
+
+function renderResumo(){
+  const banks=['CGD','Novo Banco','BCP'];
+  let h='<table><thead><tr><th>Banco</th><th style="text-align:right">Cheques</th><th style="text-align:right">Reconciliados</th><th style="text-align:right">Pendentes</th><th style="text-align:right">Valor pendente (€)</th><th>Progresso</th></tr></thead><tbody>';
+  banks.forEach(b=>{
+    const tot=cheques.filter(c=>c.banco===b).length;
+    if(!tot){h+=`<tr><td>${bankBadge(b)}</td><td colspan="5" style="color:var(--text-light);font-size:0.78rem">Sem dados</td></tr>`;return;}
+    const rec=cheques.filter(c=>c.banco===b&&c.estado==='Reconciliado').length;
+    const pend=tot-rec,val=cheques.filter(c=>c.banco===b&&c.estado==='Pendente').reduce((s,c)=>s+(c.valor||0),0);
+    const pct=Math.round(rec/tot*100),col=pct>=80?'#2E8B57':pct>=50?'#C08A0A':'#C0451E';
+    h+=`<tr><td>${bankBadge(b)}</td><td style="text-align:right">${tot}</td><td style="text-align:right;color:var(--cgd-accent)">${rec}</td><td style="text-align:right;color:#C08A0A">${pend}</td><td style="text-align:right" class="mono">${val.toLocaleString('pt-PT',{minimumFractionDigits:2})}</td><td><div class="prog-row"><div class="prog-bar"><div class="prog-fill" style="width:${pct}%;background:${col}"></div></div><span class="prog-pct">${pct}%</span></div></td></tr>`;
+  });
+  document.getElementById('tbl-resumo').innerHTML=h+'</tbody></table>';
+  const recList=cheques.filter(c=>c.estado==='Reconciliado');
+  const card=document.getElementById('card-rec');
+  if(recList.length){
+    card.style.display='block';
+    let h2='<table><thead><tr><th>N.º cheque</th><th>Banco</th><th>Data emissão</th><th>Data desconto</th><th style="text-align:right">Valor (€)</th><th>Dias</th><th>Match</th><th>Ficheiro desconto</th></tr></thead><tbody>';
+    recList.forEach(c=>{
+      const dias=c.data&&c.dataDesconto?daysBetween(c.data,c.dataDesconto):null;
+      h2+=`<tr><td class="mono">${c.num}</td><td>${bankBadge(c.banco)}</td><td>${fDate(c.data)}</td><td>${fDate(c.dataDesconto)}</td><td style="text-align:right" class="mono">${c.valor!=null?c.valor.toLocaleString('pt-PT',{minimumFractionDigits:2}):'—'}</td><td style="font-size:0.73rem;color:var(--text-light)">${dias!=null?dias+'d':'—'}</td><td>${c.matchMethod?`<span class="match-chip">${c.matchMethod}</span>`:'—'}</td><td style="font-size:0.72rem;color:var(--text-light);max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${c.ficheiroDesconto||''}">${c.ficheiroDesconto||'—'}</td></tr>`;
+    });
+    document.getElementById('tbl-rec').innerHTML=h2+'</tbody></table>';
+  }else card.style.display='none';
+}
+
+function renderHistorico(){
+  document.getElementById('hist-count').textContent=importLog.length+' ficheiro(s)';
+  if(!importLog.length){document.getElementById('hist-list').innerHTML='<div class="empty"><div class="empty-icon">🗂</div>Nenhum ficheiro importado ainda</div>';return;}
+  const sorted=[...importLog].reverse();
+  let h='';
+  sorted.forEach(l=>{
+    const dotColor=l.tipo==='contabilidade'?'#2E8B57':l.banco==='CGD'?'#2155A3':l.banco==='Novo Banco'?'#8B22A0':'#C0451E';
+    const tipoBadge=l.tipo==='contabilidade'?'<span class="badge" style="background:var(--cgd-bg);color:var(--cgd-text)">Contabilidade</span>':bankBadge(l.banco);
+    const usadoBadge=l.usado?'<span class="badge b-ok" style="font-size:0.65rem">Usado em reconciliação</span>':'<span class="badge b-gray" style="font-size:0.65rem">Não usado</span>';
+    h+=`<div class="log-row">
+      <div class="log-dot" style="background:${dotColor};margin-top:6px"></div>
+      <div style="flex:1">
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:3px">
+          <span style="font-size:0.82rem;font-weight:500">${l.ficheiro}</span>
+          ${tipoBadge} ${usadoBadge}
+          <button class="btn btn-xs btn-danger" style="margin-left:auto" onclick="pedirApagar('${l.id}')">Apagar</button>
+        </div>
+        <div style="font-size:0.72rem;color:var(--text-light)">${fDateTime(l.data)}</div>
+        <div style="font-size:0.72rem;color:var(--text-mid);margin-top:2px">${l.chequesEncontrados} cheques encontrados · ${l.chequesReconciliados} reconciliados nesta importação</div>
+      </div>
+    </div>`;
+  });
+  document.getElementById('hist-list').innerHTML=h;
+}
+
+function pedirApagar(logId){
+  const l=importLog.find(x=>x.id===logId);
+  if(!l)return;
+  const msg=l.usado
+    ?`O ficheiro <strong>${l.ficheiro}</strong> já foi usado para reconciliar cheques.<br><br>Se o apagares do histórico, os cheques reconciliados com base neste ficheiro mantêm-se reconciliados mas perdem a referência ao ficheiro de origem.<br><br><strong>Tens a certeza?</strong>`
+    :`Confirmas que queres apagar o registo do ficheiro <strong>${l.ficheiro}</strong> do histórico?`;
+  showModal(l.usado?'⚠️ Ficheiro já utilizado':'Apagar registo',msg,[
+    {label:'Cancelar',cls:'btn',action:'fecharModal()'},
+    {label:'Apagar',cls:'btn btn-danger',action:`apagarFicheiro('${logId}')`}
+  ]);
+}
+
+function apagarFicheiro(logId){
+  importLog=importLog.filter(x=>x.id!==logId);
+  fecharModal();renderHistorico();
+  const bi=document.getElementById('badge-imports');bi.textContent=importLog.length;bi.style.display=importLog.length?'inline':'none';
+}
+
+function markRec(id){
+  const c=cheques.find(x=>x.id===id);if(!c)return;
+  c.estado='Reconciliado';c.dataDesconto=new Date();c.matchMethod='manual';c.ficheiroDesconto='Marcado manualmente';
+  updateAll();
+}
+
+function limparTudo(){
+  showModal('Limpar todos os dados','Tens a certeza que queres apagar todos os cheques e o histórico? Esta ação não pode ser desfeita.',[
+    {label:'Cancelar',cls:'btn',action:'fecharModal()'},
+    {label:'Limpar tudo',cls:'btn btn-danger',action:'confirmarLimpeza()'}
+  ]);
+}
+
+function confirmarLimpeza(){
+  cheques=[];importLog=[];
+  ['conta','cgd','nb','bcp'].forEach(id=>{
+    const z=document.getElementById('zone-'+id);if(z)z.classList.remove('done');
+    ['done','rows'].forEach(s=>{const el=document.getElementById('uz-'+id+'-'+s);if(el)el.style.display='none';});
+    const l=document.querySelector('#zone-'+id+' .uz-label');if(l)l.style.display='block';
+    const ic=document.querySelector('#zone-'+id+' .uz-icon');if(ic)ic.style.display='block';
+    const fi=document.getElementById('f-'+id);if(fi)fi.value='';
+  });
+  document.getElementById('verify-list').style.display='none';
+  fecharModal();updateAll();renderHistorico();
+}
+
+function showModal(title,body,actions){
+  document.getElementById('modal-title').textContent=title;
+  document.getElementById('modal-body').innerHTML=body;
+  document.getElementById('modal-actions').innerHTML=actions.map(a=>`<button class="${a.cls}" onclick="${a.action}">${a.label}</button>`).join('');
+  document.getElementById('modal').style.display='flex';
+}
+function fecharModal(){document.getElementById('modal').style.display='none';}
+function closeModalOverlay(e){if(e.target===document.getElementById('modal'))fecharModal();}
+
+document.querySelectorAll('.panel').forEach(p=>{if(!p.classList.contains('active'))p.style.display='none';});
+updateAll();renderHistorico();
+</script>
+</body>
+</html>
